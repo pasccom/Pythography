@@ -1,0 +1,6 @@
+# Generated files:
+/doc/_build
+/__pycache__/
+
+# Test files:
+test.bib
