@@ -19,6 +19,7 @@ import bibdata
 
 import re
 import datetime
+from warnings import warn as warning
 
 class BibTeXData(bibdata.BibData):
     """ An instance of this class represents BibTex data, which is validated following BibTeX rules, when necessary.
@@ -295,12 +296,6 @@ class BibFile(bibdata.BibDataSet):
         'year': ['publication_year', 'conference_year'],
     }
 
-    warningsDisabled = False
-    @classmethod
-    def __warning(cls, msg):
-        if not cls.warningsDisabled:
-            print(f'WARNING: {msg}')
-
     def __cleanGroup(self, group):
         return re.sub(r'\s+', ' ', group)
 
@@ -312,7 +307,7 @@ class BibFile(bibdata.BibDataSet):
                 if alias in bibItem:
                     return alias
         if required:
-            self.__warning(f"Could not find required field: {field}")
+            warning(f"Could not find required field: {field}")
 
     def __genKey(self, bibItem):
         authors = bibItem[self.__getField(bibItem, 'author')]
@@ -373,7 +368,7 @@ class BibFile(bibdata.BibDataSet):
                     prevMode = mode
                     mode = COMMENT
                 else:
-                    self.__warning(f"Omitted unexpected charater: \"{c}\"")
+                    warning(f"Omitted unexpected charater: \"{c}\"")
             elif mode == COMMENT:
                 if c == '\n':
                     mode = prevMode
@@ -409,7 +404,7 @@ class BibFile(bibdata.BibDataSet):
         while True:
             c = bibFile.read(1)
             if not c:
-                self.__warning("Unexpected end of file inside entry")
+                warning("Unexpected end of file inside entry")
                 return bibData
 
             if mode == OUTSIDE:
@@ -480,7 +475,7 @@ class BibFile(bibdata.BibDataSet):
         while True:
             c = bibFile.read(1)
             if not c:
-                self.__warning("Unexpected end of file inside group")
+                warning("Unexpected end of file inside group")
                 #print(f"Parsed group: {{{self.__cleanGroup(group)}}}")
                 return self.__cleanGroup(group)
 

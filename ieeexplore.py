@@ -19,7 +19,9 @@ import bibdata
 
 import re
 import datetime
+from warnings import warn as warning
 import json
+
 from urllib.request import urlopen
 from urllib.parse import urlencode, urlparse
 import urllib.error as urlerrors
@@ -226,7 +228,6 @@ class Query:
     AscendingOrder = __SortOrder('asc')
     DescendingOrder = __SortOrder('desc')
 
-    warningsDisabled = False
     params = {
 # Search parameters:
         'abstract': {
@@ -404,17 +405,13 @@ class Query:
         except (KeyError):
             return param
 
-    def __warning(self, msg):
-        if not Query.warningsDisabled:
-            print(f'WARNING: {msg}')
-
     def __check(self, name, value):
         alone = False
         acceptWildcard = False
         acceptBooleanOperators = False
 
         if self.__alone and (name != 'article_number'):
-            self.__warning("Parameter would be ignored")
+            warning("Parameter would be ignored")
             return False
 
         for k, v in Query.params[name].items():
@@ -425,22 +422,22 @@ class Query:
                     try:
                         v(value)
                     except ValueError:
-                        self.__warning(f"Value \"{value}\" is not castable into {type(v)}")
+                        warning(f"Value \"{value}\" is not castable into {type(v)}")
                         return False
                     except TypeError:
-                        self.__warning(f"Value \"{value}\" is not of accepted type")
+                        warning(f"Value \"{value}\" is not of accepted type")
                         return False
             elif (k == 'values'):
                 if value not in v:
-                    self.__warning(f"Value \"{value}\" is not in {v}")
+                    warning(f"Value \"{value}\" is not in {v}")
                     return False
             elif (k == 'min'):
                 if (value < v):
-                    self.__warning(f"Value \"{value}\" is not smaller than minimum value {v}")
+                    warning(f"Value \"{value}\" is not smaller than minimum value {v}")
                     return False
             elif (k == 'max'):
                 if (value > v):
-                    self.__warning(f"Value \"{value}\" is not larger than maximum value {v}")
+                    warning(f"Value \"{value}\" is not larger than maximum value {v}")
                     return False
             elif (k == 'alone'):
                 alone = v
@@ -451,33 +448,33 @@ class Query:
             elif (k == 'wildcard_min_length'):
                 try:
                     if (value.index('*') < v):
-                        self.__warning(f"There must be {v} characters before wildcard")
+                        warning(f"There must be {v} characters before wildcard")
                         return False
                 except (ValueError):
                     pass
             elif (k == 'wildcard_max'):
                 if (value.count('*') > v):
-                    self.__warning(f"There must at most {v} wildcards")
+                    warning(f"There must at most {v} wildcards")
                     return False
             else:
                 raise NotImplementedError(k)
 
         if (name == 'start_year') and ('end_year' in self.__params):
             if (value > self.__params['end_year']):
-                self.__warning('Start year should be smaller than end year')
+                warning('Start year should be smaller than end year')
                 return False
 
         if (name == 'end_year') and ('start_year' in self.__params):
             if (value < self.__params['start_year']):
-                self.__warning('End year should be greater than start year')
+                warning('End year should be greater than start year')
                 return False
 
         if not acceptBooleanOperators and QueryString.isQueryString(value):
-            self.__warning("Boolean operators are not accepted")
+            warning("Boolean operators are not accepted")
             return False
 
         if not acceptWildcard and ((type(value) is str) or QueryString.isQueryString(value)) and ('*' in value):
-            self.__warning("Wildcards are not accepted")
+            warning("Wildcards are not accepted")
             return False
 
         self.__alone = alone
@@ -513,7 +510,7 @@ class Query:
         if self.__check(name, value):
             if (self.__alone):
                 for k, v in self.__params.items():
-                    self.__warning(f"Parameter \"{k}\" will be superseeded by parameter \"{name}\"")
+                    warning(f"Parameter \"{k}\" will be superseeded by parameter \"{name}\"")
                 self.__params.clear()
             self.reset()
             self.__params[name] = value

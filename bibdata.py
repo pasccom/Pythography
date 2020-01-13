@@ -16,6 +16,7 @@
 # along with Pythography. If not, see <http://www.gnu.org/licenses/>
 
 import re
+from warnings import warn as warning
 from urllib.parse import urlparse
 
 class DOI:
@@ -219,49 +220,50 @@ class BibData:
     """
     fields = {}
 
-    warningsDisabled = False
-    @classmethod
-    def __warning(cls, msg):
-        if not cls.warningsDisabled:
-            print(f'WARNING: {msg}')
-
     def __check(self, value, name):
         try:
             field = self.fields[name]
         except KeyError:
-            return self.__warning(f"Unknown result field \"{name}\"")
+            warning(f"Unknown result field \"{name}\"")
+            return
 
         try:
             v = field['type'](value)
         except ValueError:
-            return self.__warning(f"Value for result field \"{name}\" has bad type: {value}")
+            warning(f"Value for result field \"{name}\" has bad type: {value}")
+            return
 
         try:
             if (v < field['min']):
-                return self.__warning(f"Too small value for result field \"{name}\": {value}")
+                warning(f"Too small value for result field \"{name}\": {value}")
+                return
         except KeyError:
             pass
 
         try:
             if (v > field['max']):
-                return self.__warning(f"Too large value for result field \"{name}\": {value}")
+                warning(f"Too large value for result field \"{name}\": {value}")
+                return
         except KeyError:
             pass
 
         try:
             valid = field['validator'](v)
             if not valid:
-                return self.__warning(f"Invalid value for result field \"{name}\": {value}")
+                warning(f"Invalid value for result field \"{name}\": {value}")
+                return
             elif valid is not True:
                 v = valid
         except ValueError:
-            return self.__warning(f"Invalid value for result field \"{name}\": {value}")
+            warning(f"Invalid value for result field \"{name}\": {value}")
+            return
         except KeyError:
             pass
 
         try:
             if v not in field['values']:
-                return self.__warning(f"Invalid value for result field \"{name}\": {value}")
+                warning(f"Invalid value for result field \"{name}\": {value}")
+                return
         except KeyError:
             pass
 
@@ -292,7 +294,7 @@ class BibData:
         v = self.__check(value, name)
         if v is not None:
             if name in self.__data:
-                self.__warning(f"Field \"{name}\" is already present in entry")
+                warning(f"Field \"{name}\" is already present in entry")
             else:
                 self.__data[name] = v
 
