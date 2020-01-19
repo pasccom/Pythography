@@ -267,6 +267,7 @@ class Query:
         'doi': {
             'type': 'search',
             'doc': "The Digital Object Identifier (doi) is the unique identifier assigned to an article / document by CrossRef.",
+            'value_type': bibdata.DOI,
             'alone': True,
         },
         'd_publisher': {
@@ -282,6 +283,8 @@ class Query:
         'd_year': {
             'type': 'search',
             'doc': "Publication Year facet",
+            'value_type': int,
+            'max': datetime.date.today().year,
             'name': 'd-year',
         },
         'facet': {
@@ -299,10 +302,12 @@ class Query:
         'isbn': {
             'type': 'search',
             'doc': "International Standard Book Number. A number used to uniquely identify a book or non-serial.",
+            'value_type': bibdata.isbnValidator,
         },
         'issn': {
             'type': 'search',
             'doc': "International Standard Serial Number. An 8-digit number used to uniquely identify a periodical publication (journal or serial).",
+            'value_type': bibdata.issnValidator,
         },
         'is_number': {
             'type': 'search',
@@ -324,6 +329,8 @@ class Query:
         'publication_year': {
             'type': 'search',
             'doc': "The value for publication year varies by publication. It is recommended to verify the format of the particular publication within the Xplore Web product to learn how to structure your search query.",
+            'value_type': int,
+            'max': datetime.date.today().year,
         },
         'querytext': {
             'type': 'search',
@@ -422,7 +429,7 @@ class Query:
                     try:
                         v(value)
                     except ValueError:
-                        warning(f"Value \"{value}\" is not castable into {type(v)}")
+                        warning(f"Value \"{value}\" is not castable into {v}")
                         return False
                     except TypeError:
                         warning(f"Value \"{value}\" is not of accepted type")
@@ -433,11 +440,11 @@ class Query:
                     return False
             elif (k == 'min'):
                 if (value < v):
-                    warning(f"Value \"{value}\" is not smaller than minimum value {v}")
+                    warning(f"Value \"{value}\" is smaller than minimum value {v}")
                     return False
             elif (k == 'max'):
                 if (value > v):
-                    warning(f"Value \"{value}\" is not larger than maximum value {v}")
+                    warning(f"Value \"{value}\" is larger than maximum value {v}")
                     return False
             elif (k == 'alone'):
                 alone = v
@@ -801,6 +808,11 @@ class Result(bibdata.BibData):
         },
         'abstract_url': {
             'doc': "IEEE Xplore URL that will return the abstract.",
+            'type': str,
+            'validator': bibdata.urlValidator,
+        },
+        'author_url': {
+            'doc': "IEEE Xplore URL that returns the author details.",
             'type': str,
             'validator': bibdata.urlValidator,
         },
