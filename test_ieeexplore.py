@@ -19,8 +19,9 @@ from ieeexplore import QueryString as Q
 from ieeexplore import Query
 from ieeexplore import Result
 
+import warnings
 import unittest
-from testdata import TestData
+from PythonUtils.testdata import TestData
 
 from datetime import date
 from random import randrange
@@ -290,8 +291,6 @@ class MockDatabase:
 class QueryTest(unittest.TestCase):
     def __init__(self, *args, **kwArgs):
         super().__init__(*args, **kwArgs)
-
-        Query.warningsDisabled = True
         self.db = MockDatabase()
 
     @TestData([k for k, v in Query.params.items() if (v['type'] == 'search') and ('name' not in v) and ('value_type' not in v)])
@@ -342,11 +341,17 @@ class QueryTest(unittest.TestCase):
         del query[param]
         self.assertNotIn(param, query)
 
-    @TestData([k for k, v in Query.params.items() if (v['type'] == 'search') and (('boolean_operators' not in v) or (not v['boolean_operators']))])
+    @TestData([k for k, v in Query.params.items() if (v['type'] == 'search') and ('value_type' not in v) and (('boolean_operators' not in v) or (not v['boolean_operators']))])
     def testInvalidConstrctSearchParameterQueryString(self, param):
         kwArgs = {param: Q('test')}
 
-        query = Query(self.db, **kwArgs)
+        with warnings.catch_warnings(record=True) as warns:
+            query = Query(self.db, **kwArgs)
+
+            self.assertEqual(len(warns), 1)
+            self.assertTrue(issubclass(warns[0].category, UserWarning))
+            self.assertEqual(str(warns[0].message), "Boolean operators are not accepted")
+
         self.assertNotIn(param, query)
         self.assertEqual(dict(query), {})
 
@@ -370,7 +375,13 @@ class QueryTest(unittest.TestCase):
     def testInvalidConstrctSearchParameterInt(self, param):
         kwArgs = {param: 'test'}
 
-        query = Query(self.db, **kwArgs)
+        with warnings.catch_warnings(record=True) as warns:
+            query = Query(self.db, **kwArgs)
+
+            self.assertEqual(len(warns), 1)
+            self.assertTrue(issubclass(warns[0].category, UserWarning))
+            self.assertEqual(str(warns[0].message), "Value \"test\" is not castable into <class 'int'>")
+
         self.assertNotIn(param, query)
         self.assertEqual(dict(query), {})
 
@@ -390,11 +401,17 @@ class QueryTest(unittest.TestCase):
         del query[param]
         self.assertNotIn(param, query)
 
-    @TestData([k for k, v in Query.params.items() if (v['type'] == 'search') and (('wildcard' not in v) or (not v['wildcard']))])
+    @TestData([k for k, v in Query.params.items() if (v['type'] == 'search') and ('value_type' not in v) and (('wildcard' not in v) or (not v['wildcard']))])
     def testInvalidConstructSearchParameterWildcard(self, param):
         kwArgs = {param: 'test*'}
 
-        query = Query(self.db, **kwArgs)
+        with warnings.catch_warnings(record=True) as warns:
+            query = Query(self.db, **kwArgs)
+
+            self.assertEqual(len(warns), 1)
+            self.assertTrue(issubclass(warns[0].category, UserWarning))
+            self.assertEqual(str(warns[0].message), "Wildcards are not accepted")
+
         self.assertNotIn(param, query)
         self.assertEqual(dict(query), {})
 
@@ -414,7 +431,13 @@ class QueryTest(unittest.TestCase):
     def testInvalidConstructSearchParameterWildcardMinLength(self, param, minLength):
         kwArgs = {param: ('x' * (minLength - 1)) + '*'}
 
-        query = Query(self.db, **kwArgs)
+        with warnings.catch_warnings(record=True) as warns:
+            query = Query(self.db, **kwArgs)
+
+            self.assertEqual(len(warns), 1)
+            self.assertTrue(issubclass(warns[0].category, UserWarning))
+            self.assertEqual(str(warns[0].message), f"There must be {minLength} characters before wildcard")
+
         self.assertNotIn(param, query)
         self.assertEqual(dict(query), {})
 
@@ -434,7 +457,13 @@ class QueryTest(unittest.TestCase):
     def testInvalidConstructSearchParameterMaxWildcards(self, param, maxWildcards):
         kwArgs = {param: 'test' + ('*' * (maxWildcards + 1))}
 
-        query = Query(self.db, **kwArgs)
+        with warnings.catch_warnings(record=True) as warns:
+            query = Query(self.db, **kwArgs)
+
+            self.assertEqual(len(warns), 1)
+            self.assertTrue(issubclass(warns[0].category, UserWarning))
+            self.assertEqual(str(warns[0].message), f"There must at most {maxWildcards} wildcards")
+
         self.assertNotIn(param, query)
         self.assertEqual(dict(query), {})
 
@@ -454,25 +483,37 @@ class QueryTest(unittest.TestCase):
         del query[param]
         self.assertNotIn(param, query)
 
-    @TestData([k for k, v in Query.params.items() if (v['type'] == 'search') and (k not in ['article_number', 'doi'])])
+    @TestData([k for k, v in Query.params.items() if (v['type'] == 'search') and ('value_type' not in v) and (k not in ['article_number', 'doi'])])
     def testConstructDoiAlone(self, otherParam):
-        kwArgs = {otherParam: 'delete', 'doi': 'test'}
+        kwArgs = {otherParam: 'delete', 'doi': '10.1234/56789'}
 
-        query = Query(self.db, **kwArgs)
+        with warnings.catch_warnings(record=True) as warns:
+            query = Query(self.db, **kwArgs)
+
+            self.assertEqual(len(warns), 1)
+            self.assertTrue(issubclass(warns[0].category, UserWarning))
+            self.assertEqual(str(warns[0].message), f"Parameter \"{otherParam}\" will be superseeded by parameter \"doi\"")
+
         self.assertIn('doi', query)
         self.assertNotIn(otherParam, query)
-        self.assertEqual(query['doi'], 'test')
-        self.assertEqual(dict(query), {'doi': 'test'})
+        self.assertEqual(query['doi'], '10.1234/56789')
+        self.assertEqual(dict(query), {'doi': '10.1234/56789'})
 
         query.send()
-        self.assertGreaterEqual(set(self.db.lastQuery.split('&')), {'doi=test'})
+        self.assertGreaterEqual(set(self.db.lastQuery.split('&')), {'doi=10.1234%2F56789'})
         self.db.clear()
 
-    @TestData([k for k, v in Query.params.items() if (v['type'] == 'search') and (k not in ['article_number'])])
+    @TestData([k for k, v in Query.params.items() if (v['type'] == 'search') and ('value_type' not in v) and (k not in ['article_number'])])
     def testConstructArticleNumberAlone(self, otherParam):
         kwArgs = {otherParam: 'delete', 'article_number': 1}
 
-        query = Query(self.db, **kwArgs)
+        with warnings.catch_warnings(record=True) as warns:
+            query = Query(self.db, **kwArgs)
+
+            self.assertEqual(len(warns), 1)
+            self.assertTrue(issubclass(warns[0].category, UserWarning))
+            self.assertEqual(str(warns[0].message), f"Parameter \"{otherParam}\" will be superseeded by parameter \"article_number\"")
+
         self.assertIn('article_number', query)
         self.assertNotIn(otherParam, query)
         self.assertEqual(query['article_number'], 1)
@@ -527,10 +568,17 @@ class QueryTest(unittest.TestCase):
         del query[param]
         self.assertNotIn(param, query)
 
-    @TestData([k for k, v in Query.params.items() if (v['type'] == 'search') and (('boolean_operators' not in v) or (not v['boolean_operators']))])
+    @TestData([k for k, v in Query.params.items() if (v['type'] == 'search') and ('value_type' not in v) and (('boolean_operators' not in v) or (not v['boolean_operators']))])
     def testInvalidSetSearchParameterQueryString(self, param):
         query = Query(self.db)
-        query[param] = Q('test')
+
+        with warnings.catch_warnings(record=True) as warns:
+            query[param] = Q('test')
+
+            self.assertEqual(len(warns), 1)
+            self.assertTrue(issubclass(warns[0].category, UserWarning))
+            self.assertEqual(str(warns[0].message), "Boolean operators are not accepted")
+
         self.assertNotIn(param, query)
         self.assertEqual(dict(query), {})
 
@@ -553,7 +601,14 @@ class QueryTest(unittest.TestCase):
     @TestData([k for k, v in Query.params.items() if (v['type'] == 'search') and ('name' not in v) and ('value_type' in v) and (v['value_type'] == int)])
     def testInvalidSetSearchParameterInt(self, param):
         query = Query(self.db)
-        query[param] = 'test'
+
+        with warnings.catch_warnings(record=True) as warns:
+            query[param] = 'test'
+
+            self.assertEqual(len(warns), 1)
+            self.assertTrue(issubclass(warns[0].category, UserWarning))
+            self.assertEqual(str(warns[0].message), "Value \"test\" is not castable into <class 'int'>")
+
         self.assertNotIn(param, query)
         self.assertEqual(dict(query), {})
 
@@ -572,10 +627,17 @@ class QueryTest(unittest.TestCase):
         del query[param]
         self.assertNotIn(param, query)
 
-    @TestData([k for k, v in Query.params.items() if (v['type'] == 'search') and (('wildcard' not in v) or (not v['wildcard']))])
+    @TestData([k for k, v in Query.params.items() if (v['type'] == 'search') and ('value_type' not in v) and (('wildcard' not in v) or (not v['wildcard']))])
     def testInvalidSetSearchParameterWildcard(self, param):
         query = Query(self.db)
-        query[param] = 'test*'
+
+        with warnings.catch_warnings(record=True) as warns:
+            query[param] = 'test*'
+
+            self.assertEqual(len(warns), 1)
+            self.assertTrue(issubclass(warns[0].category, UserWarning))
+            self.assertEqual(str(warns[0].message), "Wildcards are not accepted")
+
         self.assertNotIn(param, query)
         self.assertEqual(dict(query), {})
 
@@ -593,7 +655,14 @@ class QueryTest(unittest.TestCase):
     @TestData([(k, v['wildcard_min_length']) for k, v in Query.params.items() if (v['type'] == 'search') and ('wildcard_min_length' in v)])
     def testInvalidSetSearchParameterWildcardMinLength(self, param, minLength):
         query = Query(self.db)
-        query[param] = ('x' * (minLength - 1)) + '*'
+
+        with warnings.catch_warnings(record=True) as warns:
+            query[param] = ('x' * (minLength - 1)) + '*'
+
+            self.assertEqual(len(warns), 1)
+            self.assertTrue(issubclass(warns[0].category, UserWarning))
+            self.assertEqual(str(warns[0].message), f"There must be {minLength} characters before wildcard")
+
         self.assertNotIn(param, query)
         self.assertEqual(dict(query), {})
 
@@ -611,7 +680,14 @@ class QueryTest(unittest.TestCase):
     @TestData([(k, v['wildcard_max']) for k, v in Query.params.items() if (v['type'] == 'search') and ('wildcard_max' in v)])
     def testInvalidSetSearchParameterMaxWildcards(self, param, maxWildcards):
         query = Query(self.db)
-        query[param] = 'test' + ('*' * (maxWildcards + 1))
+
+        with warnings.catch_warnings(record=True) as warns:
+            query[param] = 'test' + ('*' * (maxWildcards + 1))
+
+            self.assertEqual(len(warns), 1)
+            self.assertTrue(issubclass(warns[0].category, UserWarning))
+            self.assertEqual(str(warns[0].message), f"There must at most {maxWildcards} wildcards")
+
         self.assertNotIn(param, query)
         self.assertEqual(dict(query), {})
 
@@ -630,27 +706,39 @@ class QueryTest(unittest.TestCase):
         del query[param]
         self.assertNotIn(param, query)
 
-    @TestData([k for k, v in Query.params.items() if (v['type'] == 'search') and (k not in ['article_number', 'doi'])])
+    @TestData([k for k, v in Query.params.items() if (v['type'] == 'search') and ('value_type' not in v) and (k not in ['article_number', 'doi'])])
     def testSetDoiAlone(self, otherParam):
         kwArgs = {otherParam: 'delete'}
 
         query = Query(self.db, **kwArgs)
-        query['doi'] = 'test'
+        with warnings.catch_warnings(record=True) as warns:
+            query['doi'] = '10.1234/56789'
+
+            self.assertEqual(len(warns), 1)
+            self.assertTrue(issubclass(warns[0].category, UserWarning))
+            self.assertEqual(str(warns[0].message), f"Parameter \"{otherParam}\" will be superseeded by parameter \"doi\"")
+
         self.assertIn('doi', query)
         self.assertNotIn(otherParam, query)
-        self.assertEqual(query['doi'], 'test')
-        self.assertEqual(dict(query), {'doi': 'test'})
+        self.assertEqual(query['doi'], '10.1234/56789')
+        self.assertEqual(dict(query), {'doi': '10.1234/56789'})
 
         query.send()
-        self.assertGreaterEqual(set(self.db.lastQuery.split('&')), {'doi=test'})
+        self.assertGreaterEqual(set(self.db.lastQuery.split('&')), {'doi=10.1234%2F56789'})
         self.db.clear()
 
-    @TestData([k for k, v in Query.params.items() if (v['type'] == 'search') and (k not in ['article_number'])])
+    @TestData([k for k, v in Query.params.items() if (v['type'] == 'search') and ('value_type' not in v) and (k not in ['article_number'])])
     def testSetArticleNumberAlone(self, otherParam):
         kwArgs = {otherParam: 'delete'}
 
         query = Query(self.db, **kwArgs)
-        query['article_number'] = 1
+        with warnings.catch_warnings(record=True) as warns:
+            query['article_number'] = 1
+
+            self.assertEqual(len(warns), 1)
+            self.assertTrue(issubclass(warns[0].category, UserWarning))
+            self.assertEqual(str(warns[0].message), f"Parameter \"{otherParam}\" will be superseeded by parameter \"article_number\"")
+
         self.assertIn('article_number', query)
         self.assertNotIn(otherParam, query)
         self.assertEqual(query['article_number'], 1)
@@ -712,7 +800,13 @@ class QueryTest(unittest.TestCase):
 
     def testFilterByInvalidYearRange(self):
         query = Query(self.db)
-        query.filterBy(start_year=2019, end_year=2018)
+        with warnings.catch_warnings(record=True) as warns:
+            query.filterBy(start_year=2019, end_year=2018)
+
+            self.assertEqual(len(warns), 1)
+            self.assertTrue(issubclass(warns[0].category, UserWarning))
+            self.assertEqual(str(warns[0].message), "End year should be greater than start year")
+
         self.assertEqual(query['start_year'], 2019)
         self.assertNotIn('end_year', query)
 
@@ -724,7 +818,12 @@ class QueryTest(unittest.TestCase):
         query = Query(self.db)
         query.filterBy(start_year=2019)
         self.assertEqual(query['start_year'], 2019)
-        query.filterBy(end_year=2018)
+        with warnings.catch_warnings(record=True) as warns:
+            query.filterBy(end_year=2018)
+
+            self.assertEqual(len(warns), 1)
+            self.assertTrue(issubclass(warns[0].category, UserWarning))
+            self.assertEqual(str(warns[0].message), "End year should be greater than start year")
         self.assertNotIn('end_year', query)
 
         query.send()
@@ -735,7 +834,12 @@ class QueryTest(unittest.TestCase):
         query = Query(self.db)
         query.filterBy(end_year=2018)
         self.assertEqual(query['end_year'], 2018)
-        query.filterBy(start_year=2019)
+        with warnings.catch_warnings(record=True) as warns:
+            query.filterBy(start_year=2019)
+
+            self.assertEqual(len(warns), 1)
+            self.assertTrue(issubclass(warns[0].category, UserWarning))
+            self.assertEqual(str(warns[0].message), "Start year should be smaller than end year")
         self.assertNotIn('start_year', query)
 
         query.send()
@@ -884,7 +988,14 @@ class QueryTest(unittest.TestCase):
     @TestData([201, 400])
     def testInvalidLimit(self, limit):
         query = Query(self.db)
-        query.limit(limit)
+
+        with warnings.catch_warnings(record=True) as warns:
+            query.limit(limit)
+
+            self.assertEqual(len(warns), 1)
+            self.assertTrue(issubclass(warns[0].category, UserWarning))
+            self.assertEqual(str(warns[0].message), f"Value \"{limit}\" is larger than maximum value 200")
+
         self.assertNotIn('max_records', query)
 
     def testSend(self):
@@ -1058,28 +1169,6 @@ class ResultTest(unittest.TestCase):
         self.assertEqual(result[name], value)
 
     @TestData([
-        {'name': "article_number",      'value': "Text"                 },
-        {'name': "rank",                'value': "Text"                 },
-        {'name': "is_number",           'value': "Text"                 },
-        {'name': "publication_number",  'value': "Text"                 },
-        {'name': "publication_year",    'value': "Text"                 },
-        {'name': "start_page",          'value': "Text"                 },
-        {'name': "end_page",            'value': "Text"                 },
-        {'name': "citing_paper_count",  'value': "Text"                 },
-        {'name': "citing_patent_count", 'value': "Text"                 },
-        {'name': "volume",              'value': "Text"                 },
-        {'name': "article_number",      'value': -1                     },
-        {'name': "rank",                'value': 0                      },
-        {'name': "is_number",           'value': -1                     },
-        {'name': "publication_number",  'value': -1                     },
-        {'name': "standard_number",     'value': -1                     },
-        {'name': "publication_year",    'value': date.today().year + 1  },
-        {'name': "start_page",          'value': 0                      },
-        {'name': "end_page",            'value': 0                      },
-        {'name': "citing_paper_count",  'value': -1                     },
-        {'name': "citing_patent_count", 'value': -1                     },
-        {'name': "issue",               'value': 0                      },
-        {'name': "volume",              'value': 0                      },
         {'name': "doi",                 'value': '11.1234/56789'        },
         {'name': "doi",                 'value': '11.abcd/suffix'       },
         {'name': "doi",                 'value': '10.123/56789'         },
@@ -1104,11 +1193,73 @@ class ResultTest(unittest.TestCase):
         {'name': "content_type",        'value': "Invalid"              },
         {'name': "publisher",           'value': "Invalid"              },
     ])
-    def testInvalidConstrctor(self, name, value):
-        Result.warningsDisabled = True
-        result = Result({name: value})
+    def testConstructorInvalidValue(self, name, value):
+        with warnings.catch_warnings(record=True) as warns:
+            result = Result({name: value})
+
+            self.assertEqual(len(warns), 1)
+            self.assertTrue(issubclass(warns[0].category, UserWarning))
+            self.assertEqual(str(warns[0].message), f"Invalid value for result field \"{name}\": {value}")
+
         self.assertNotIn(name, result)
-        Result.warningsDisabled = False
+
+    @TestData([
+        {'name': "article_number",      'value': "Text"                 },
+        {'name': "rank",                'value': "Text"                 },
+        {'name': "is_number",           'value': "Text"                 },
+        {'name': "publication_number",  'value': "Text"                 },
+        {'name': "publication_year",    'value': "Text"                 },
+        {'name': "start_page",          'value': "Text"                 },
+        {'name': "end_page",            'value': "Text"                 },
+        {'name': "citing_paper_count",  'value': "Text"                 },
+        {'name': "citing_patent_count", 'value': "Text"                 },
+        {'name': "volume",              'value': "Text"                 },
+    ])
+    def testConstructorInvalidType(self, name, value):
+        with warnings.catch_warnings(record=True) as warns:
+            result = Result({name: value})
+
+            self.assertEqual(len(warns), 1)
+            self.assertTrue(issubclass(warns[0].category, UserWarning))
+            self.assertEqual(str(warns[0].message), f"Value for result field \"{name}\" has bad type: {value}")
+
+        self.assertNotIn(name, result)
+
+    @TestData([
+        {'name': "article_number",      'value': -1                     },
+        {'name': "rank",                'value': 0                      },
+        {'name': "is_number",           'value': -1                     },
+        {'name': "publication_number",  'value': -1                     },
+        {'name': "standard_number",     'value': -1                     },
+        {'name': "start_page",          'value': 0                      },
+        {'name': "end_page",            'value': 0                      },
+        {'name': "citing_paper_count",  'value': -1                     },
+        {'name': "citing_patent_count", 'value': -1                     },
+        {'name': "issue",               'value': 0                      },
+        {'name': "volume",              'value': 0                      },
+    ])
+    def testConstructorTooSmallValue(self, name, value):
+        with warnings.catch_warnings(record=True) as warns:
+            result = Result({name: value})
+
+            self.assertEqual(len(warns), 1)
+            self.assertTrue(issubclass(warns[0].category, UserWarning))
+            self.assertEqual(str(warns[0].message), f"Too small value for result field \"{name}\": {value}")
+
+        self.assertNotIn(name, result)
+
+    @TestData([
+        {'name': "publication_year",    'value': date.today().year + 1  },
+    ])
+    def testConstructorTooLargeValue(self, name, value):
+        with warnings.catch_warnings(record=True) as warns:
+            result = Result({name: value})
+
+            self.assertEqual(len(warns), 1)
+            self.assertTrue(issubclass(warns[0].category, UserWarning))
+            self.assertEqual(str(warns[0].message), f"Too large value for result field \"{name}\": {value}")
+
+        self.assertNotIn(name, result)
 
     @TestData([
         {'value': "Journals"        , 'bibType': 'article'      },
@@ -1244,10 +1395,14 @@ class ResultTest(unittest.TestCase):
         {'name': 'publication_date', 'value': '32 Mar. 1989'},
     ])
     def testInvalidDates(self, name, value):
-        Result.warningsDisabled = True
-        result = Result({name: value})
+        with warnings.catch_warnings(record=True) as warns:
+            result = Result({name: value})
+
+            self.assertEqual(len(warns), 1)
+            self.assertTrue(issubclass(warns[0].category, UserWarning))
+            self.assertEqual(str(warns[0].message), f"Value for result field \"{name}\" has bad type: {value}")
+
         self.assertNotIn(name, result)
-        Result.warningsDisabled = False
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)

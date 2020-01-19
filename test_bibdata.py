@@ -17,8 +17,9 @@
 
 from bibdata import *
 
+import warnings
 import unittest
-from testdata import TestData
+from PythonUtils.testdata import TestData
 
 class ValidatorTest(unittest.TestCase):
     @TestData([
@@ -282,6 +283,16 @@ class MockBibDataSet(BibDataSet):
     dataType = MockBibData
 
 class MockBibDataTest(unittest.TestCase):
+    def __checkWarnings(self, actual, expected):
+        expectedMessages = {
+            'field0': 'Unknown result field "field0"',
+            'field1': 'Too small value for result field "field1": 0',
+        }
+        self.assertEqual(len(actual), len(expected))
+        for i, k in enumerate(expected):
+            self.assertTrue(issubclass(actual[i].category, UserWarning))
+            self.assertEqual(str(actual[i].message), expectedMessages[k])
+
     @TestData([
         {'raw': {'field1': 1}},
         {'raw': {'field2': 1}},
@@ -300,9 +311,11 @@ class MockBibDataTest(unittest.TestCase):
         {'raw': {'field0': 1, 'field1': 0}},
     ])
     def testInvalidConstructor(self, raw):
-        BibData.warningsDisabled = True
-        data = MockBibData(raw)
-        BibData.warningsDisabled = False
+        with warnings.catch_warnings(record=True) as warns:
+            data = MockBibData(raw)
+
+            self.__checkWarnings(warns, raw)
+
         for k in raw:
             self.assertNotIn(k, data)
         self.assertEqual({k: v for k, v in data}, {})
@@ -329,10 +342,11 @@ class MockBibDataTest(unittest.TestCase):
     ])
     def testInvalidSetItem(self, raw):
         data = MockBibData()
-        BibData.warningsDisabled = True
-        for k, v in raw.items():
-            data[k] = v
-        BibData.warningsDisabled = False
+        with warnings.catch_warnings(record=True) as warns:
+            for k, v in raw.items():
+                data[k] = v
+
+            self.__checkWarnings(warns, raw)
 
         for k in raw:
             self.assertNotIn(k, data)
