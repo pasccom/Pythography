@@ -223,7 +223,7 @@ class AuthorTest(unittest.TestCase):
         self.assertEqual(author['initial'], initial)
 
     @TestData([
-        {'value': ["Name1", "Firstname"],                                   'string': "Name1-Name2, Firstname"},
+        {'value': ["Name1", "Firstname"],                                   'string': "Name1, Firstname"},
         {'value': ["Name1", "Firstname", "Secondname"],                     'string': "Name1, Firstname Secondname"},
         {'value': ["Name1", "Firstname", "Secondname", "Thirdname"],        'string': "Name1, Firstname Secondname Thirdname"},
         {'value': ["Name1-Name2", "Firstname"],                             'string': "Name1-Name2, Firstname"},
