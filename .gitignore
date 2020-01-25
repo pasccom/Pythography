@@ -2,5 +2,5 @@
 /doc/_build
 /__pycache__/
 
-# Test files:
-test.bib
+# Filtre rsync:
+.rsync-filter
