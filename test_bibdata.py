@@ -376,5 +376,14 @@ class BibDataSetTest(unittest.TestCase):
         self.assertEqual(len(dataSet), len(data))
         self.assertEqual([dict(d) for d in dataSet], data)
 
-
-
+    @TestData([
+        [[{'field1': 1}], 0, {'field1': 1}],
+        [[{'field1': 1}, {'field1': 2}], 0, {'field1': 1}],
+        [[{'field1': 1}, {'field1': 2}], 1, {'field1': 2}],
+        [[{'field1': 1}, {'field1': 2}, {'field1': 3}], 0, {'field1': 1}],
+        [[{'field1': 1}, {'field1': 2}, {'field1': 3}], 1, {'field1': 2}],
+        [[{'field1': 1}, {'field1': 2}, {'field1': 3}], 2, {'field1': 3}],
+    ])
+    def testGetItem(self, data, index, datum):
+        dataSet = MockBibDataSet(data)
+        self.assertEqual(dict(dataSet[index]), datum)

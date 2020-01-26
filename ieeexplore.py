@@ -1037,6 +1037,10 @@ class ResultSet(bibdata.BibDataSet):
         except KeyError as e:
             super().__init__()
 
+    def __getitem__(self, item):
+        while (item >= super().__len__()):
+            self.fetchMore()
+        return super().__getitem__(item)
 
     def __len__(self):
         return self.__total if self.__lazyComplete else super().__len__()

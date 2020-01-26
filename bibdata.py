@@ -322,6 +322,9 @@ class BibDataSet:
             except KeyError:
                 self.__data = []
 
+    def __getitem__(self, item):
+        return self.__data[item]
+
     def __len__(self):
         return len(self.__data)
 
