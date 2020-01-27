@@ -186,7 +186,7 @@ class BibTeXData(bibdata.BibData):
             try:
                 return self.__fields[name]
             except KeyError as e:
-                if name.isalpha():
+                if re.fullmatch(r'[a-z][a-z0-9_]*', name):
                     return {
                         'doc': "Unofficial user-defined field.",
                         'type': str,
@@ -296,6 +296,8 @@ class BibFile(bibdata.BibDataSet):
         'year': ['publication_year', 'conference_year'],
     }
 
+    dataType = BibTeXData
+
     def __cleanGroup(self, group):
         return re.sub(r'\s+', ' ', group)
 
@@ -309,36 +311,45 @@ class BibFile(bibdata.BibDataSet):
         if required:
             warning(f"Could not find required field: {field}")
 
-    def __genKey(self, bibItem):
-        authors = bibItem[self.__getField(bibItem, 'author')]
-        key = ''.join([authors[0]['name']] + [author['initial'] for author in authors[1:]])
+    def __genKey(self, bibItem, mangle=True):
+        if 'key' in bibItem:
+            key = bibItem['key']
+        else:
+            authors = bibItem[self.__getField(bibItem, 'author')]
+            key = ''.join([authors[0]['name']] + [author['initial'] for author in authors[1:]])
 
-        try:
-            key += str(bibItem[self.__getField(bibItem, 'year')])
-        except KeyError:
-            pass
+            try:
+                key += str(bibItem[self.__getField(bibItem, 'year')])
+            except KeyError:
+                pass
 
-        print(bibItem)
-        print(type(bibItem))
-        try:
-            key += bibItem[self.__getField(bibItem, 'publication_code')]
-        except KeyError:
-            pass
+            print(bibItem)
+            print(type(bibItem))
+            try:
+                key += bibItem[self.__getField(bibItem, 'publication_code')]
+            except KeyError:
+                pass
+
+        if mangle:
+            if (key in self.__usedKeys) and (self.__usedKeys[key] != 0):
+                self.__usedKeys[key] += 1
+                return key + '-' + str(self.__usedKeys[key] - 1)
 
         return key
 
     def __init__(self, filePath, data=None):
         super().__init__(data)
-        self.__filePath = filePath
-        if self.__filePath[-4:] != '.bib':
-            self.__filePath += '.bib'
+        self.filePath = filePath
+        if self.filePath[-4:] != '.bib':
+            self.filePath += '.bib'
+        self.__usedKeys = {}
 
     def read(self):
         """ read()
 
             This method opens the ``*.bib`` file, parses it and loads its content into the underlying :class:`BibDataSet`
         """
-        with open(self.__filePath, 'rt') as bibFile:
+        with open(self.filePath, 'rt') as bibFile:
             self.parseFile(bibFile)
 
     def parseFile(self, bibFile):
@@ -508,9 +519,18 @@ class BibFile(bibdata.BibDataSet):
 
             :param mode: The mode for opening the ``*.bib`` file (should be ``'at'`` for appending data or ``'wt'`` for overwriting data).
         """
-        with open(self.__filePath, mode) as bibFile:
+        self.__usedKeys = {}
+        for bibItem in self:
+            key = self.__genKey(bibItem, mangle=False)
+            if key in self.__usedKeys:
+                self.__usedKeys[key] = 1
+            else:
+                self.__usedKeys[key] = 0
+        print(self.__usedKeys)
+
+        with open(self.filePath, mode) as bibFile:
             for bibItem in self:
-                bibFile.write(f"@{bibItem['content_type'].upper()} {{{self.__genKey(bibItem)},\n")
+                bibFile.write(f"@{bibItem['content_type'].upper()}{{{self.__genKey(bibItem)},\n")
                 fieldsDone = ['content_type']
                 # Output required fields:
                 for f in self.bibTypes[bibItem['content_type']]['required']:
@@ -526,6 +546,8 @@ class BibFile(bibdata.BibDataSet):
                         fieldsDone += [field]
                 # Output available bibTeX fields:
                 for field, aliases in self.fieldAliases.items():
+                    if field in fieldsDone:
+                        continue
                     for alias in aliases:
                         if alias in fieldsDone:
                             break
@@ -536,7 +558,7 @@ class BibFile(bibdata.BibDataSet):
                             pass
                 # Output other fields:
                 for field, value in bibItem:
-                    if field in fieldsDone:
+                    if (field in fieldsDone) or (field == 'key'):
                         continue
                     bibFile.write(f"  {field} = {{{value}}},\n")
                 bibFile.write('}\n\n')
