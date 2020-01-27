@@ -608,7 +608,7 @@ class Query:
                 try:
                     start += self.__params['max_records']
                 except (KeyError):
-                    start += 200
+                    start += 25
             except (KeyError):
                 start = 1
         self.__params['start_record'] = start
@@ -698,9 +698,10 @@ class Result(bibdata.BibData):
 
     class __Dates:
         def __init__(self, value):
-            months = ['Jan.', 'Feb.', 'Mar.', 'Apr.', 'May', 'June', 'July', 'Aug.', 'Sep.', 'Oct.', 'Nov.', 'Dec.']
+            #months = ['Jan.', 'Feb.', 'Mar.', 'Apr.', 'May', 'June', 'July', 'Aug.', 'Sep.', 'Oct.', 'Nov.', 'Dec.']
+            months = ['Jan.', 'Feb.', 'Mar.', 'Apr.', 'May', 'June', 'July', 'Aug.', 'Sept.', 'Oct.', 'Nov.', 'Dec.']
 
-            day = r'\d{1,2}'
+            day = r'0?[1-9]|[1-2][0-9]|3[01]'
             month = '|'.join(months)
             year = r'\d{4}'
 
@@ -708,9 +709,19 @@ class Result(bibdata.BibData):
             if m is None:
                 m = re.fullmatch(f'(?P<beginDay>{day})-(?P<endDay>{day}) (?P<beginMonth>{month}) (?P<beginYear>{year})', value)
             if m is None:
+                m = re.fullmatch(f'(?P<beginMonth>{month}) (?P<beginYear>{year})', value)
+            if m is None:
                 m = re.fullmatch(f'(?P<beginDay>{day}) (?P<beginMonth>{month})-(?P<endDay>{day}) (?P<endMonth>{month}) (?P<beginYear>{year})', value)
             if m is None:
+                m = re.fullmatch(f'(?P<beginMonth>{month})-(?P<endMonth>{month}) (?P<beginYear>{year})', value)
+            if m is None:
+                m = re.fullmatch(f'(?P<beginYear>{year})', value)
+            if m is None:
                 m = re.fullmatch(f'(?P<beginDay>{day}) (?P<beginMonth>{month}) (?P<beginYear>{year})-(?P<endDay>{day}) (?P<endMonth>{month}) (?P<endYear>{year})', value)
+            if m is None:
+                m = re.fullmatch(f'(?P<beginMonth>{month}) (?P<beginYear>{year})-(?P<endMonth>{month}) (?P<endYear>{year})', value)
+            if m is None:
+                m = re.fullmatch(f'(?P<beginYear>{year})-(?P<endYear>{year})', value)
             if m is None:
                 raise ValueError(f"Invalid date: {value}")
             m = m.groupdict()
@@ -718,18 +729,24 @@ class Result(bibdata.BibData):
             # Validate begin day:
             try:
                 m['beginDay'] = int(m['beginDay'])
+            except KeyError:
+                m['beginDay'] = None
             except ValueError:
                 raise ValueError(f"Invalid begin day: {m['beginDay']}")
 
             # Validate begin month:
             try:
                 m['beginMonth'] = months.index(m['beginMonth']) + 1
+            except KeyError:
+                m['beginMonth'] = None
             except ValueError:
                 raise ValueError(f"Invalid begin month: {m['beginMonth']}")
 
             # Validate begin year:
             try:
                 m['beginYear'] = int(m['beginYear'])
+            except KeyError:
+                m['beginYear'] = None
             except ValueError:
                 raise ValueError(f"Invalid begin year: {m['beginYear']}")
 
@@ -757,14 +774,17 @@ class Result(bibdata.BibData):
             except ValueError:
                 raise ValueError(f"Invalid end year: {m['endYear']}")
 
-            self.begin = datetime.date(m['beginYear'], m['beginMonth'], m['beginDay'])
-            self.end = datetime.date(m['endYear'], m['endMonth'], m['endDay'])
+            self.begin = bibdata.Date(m['beginYear'], m['beginMonth'], m['beginDay'])
+            self.end = bibdata.Date(m['endYear'], m['endMonth'], m['endDay'])
 
         def __repr__(self):
             return f"{repr(self.begin)} -- {repr(self.end)}"
 
         def __str__(self):
-            return f"{self.begin.isoformat().replace('-', '.')}--{str(self.end.isoformat().replace('-', '.'))}"
+            if (self.begin == self.end):
+                return str(self.begin)
+            else:
+                return f"{str(self.begin)}--{str(self.end)}"
 
 
     class __IndexTerms:
@@ -1011,7 +1031,10 @@ class Result(bibdata.BibData):
             if name == 'publication_code':
                 parts = self.__getitem__('doi').suffix.split('.')
                 if len(parts) > 1:
-                    return parts[0]
+                    try:
+                        int(parts[0])
+                    except ValueError:
+                        return parts[0]
             raise e
 
 class ResultSet(bibdata.BibDataSet):
@@ -1028,7 +1051,7 @@ class ResultSet(bibdata.BibDataSet):
         self.__lazyComplete = False
         try:
             self.searched = results['total_searched']
-            self.__total = results['total_records']
+            self.total = results['total_records']
         except KeyError as e:
             raise ValueError('Invalid result set') from e
 
@@ -1043,7 +1066,7 @@ class ResultSet(bibdata.BibDataSet):
         return super().__getitem__(item)
 
     def __len__(self):
-        return self.__total if self.__lazyComplete else super().__len__()
+        return self.total if self.__lazyComplete else super().__len__()
 
     def __iter__(self):
         # Yield items already in data set:
@@ -1064,15 +1087,14 @@ class ResultSet(bibdata.BibDataSet):
                 for m in more:
                     yield m
             except EOFError as e:
-                if (super().__len__() != self.__total):
-                    raise ResourceWarning(f"Expected number of articles does not match actual number of articles ({super().__len__()} != {self.__total})") from e
+                if (super().__len__() != self.total):
+                    raise ResourceWarning(f"Expected number of articles does not match actual number of articles ({super().__len__()} != {self.total})") from e
                 return
 
     def __iadd__(self, other):
-        if (self.__total != other.__total):
+        if (self.total != other.total):
             print(f"WARNING: Total number of articles mismatch")
         super().__iadd__(other)
-
 
     def fetchMore(self):
         """ Fetches more bibliography data from IEEE Xplore API using the same query as previously.
@@ -1104,8 +1126,8 @@ class ResultSet(bibdata.BibDataSet):
             try:
                 self.fetchMore()
             except EOFError as e:
-                if (super().__len__() != self.__total):
-                    raise ResourceWarning(f"Expected number of articles does not match actual number of articles ({super().__len__()} != {self.__total})") from e
+                if (super().__len__() != self.total):
+                    raise ResourceWarning(f"Expected number of articles does not match actual number of articles ({super().__len__()} != {self.total})") from e
                 return self
 
 

@@ -274,7 +274,7 @@ class MockDatabase:
         startRecord = int(startRecord[0].replace('start_record=', '')) if len(startRecord) > 0 else 1
 
         maxRecords = [p for p in query.split('&') if 'max_records=' in p]
-        maxRecords = int(maxRecords[0].replace('max_records=', '')) if len(maxRecords) > 0 else 200
+        maxRecords = int(maxRecords[0].replace('max_records=', '')) if len(maxRecords) > 0 else 25
 
         if (startRecord > self.totalRecords):
             return {
@@ -1003,13 +1003,13 @@ class QueryTest(unittest.TestCase):
         query = Query(db)
 
         results = query.send()
-        self.assertLessEqual(len(results), 200)
+        self.assertLessEqual(len(results), 25)
         self.assertGreaterEqual(set(db.lastQuery.split('&')), {f"start_record=1"})
         db.clear()
 
         results = query.send()
         self.assertLessEqual(len(results), 200)
-        self.assertGreaterEqual(set(db.lastQuery.split('&')), {f"start_record=201"})
+        self.assertGreaterEqual(set(db.lastQuery.split('&')), {f"start_record=26"})
         db.clear()
 
     @TestData([1, 100, 200])
@@ -1367,20 +1367,35 @@ class ResultTest(unittest.TestCase):
             self.assertEqual(author['forenames'], expectedForenames)
 
     @TestData([
-        {'name': 'conference_dates', 'value': '11 Mar. 1989',               'begin': date(1989, 3, 11), 'end': date(1989, 3, 11)},
-        {'name': 'conference_dates', 'value': '10-12 Mar. 1989',            'begin': date(1989, 3, 10), 'end': date(1989, 3, 12)},
-        {'name': 'conference_dates', 'value': '10 Feb.-12 Apr. 1989',       'begin': date(1989, 2, 10), 'end': date(1989, 4, 12)},
-        {'name': 'conference_dates', 'value': '10 Feb. 1988-12 Apr. 1990',  'begin': date(1988, 2, 10), 'end': date(1990, 4, 12)},
-        {'name': 'publication_date', 'value': '11 Mar. 1989',               'begin': date(1989, 3, 11), 'end': date(1989, 3, 11)},
-        {'name': 'publication_date', 'value': '10-12 Mar. 1989',            'begin': date(1989, 3, 10), 'end': date(1989, 3, 12)},
-        {'name': 'publication_date', 'value': '10 Feb.-12 Apr. 1989',       'begin': date(1989, 2, 10), 'end': date(1989, 4, 12)},
-        {'name': 'publication_date', 'value': '10 Feb. 1988-12 Apr. 1990',  'begin': date(1988, 2, 10), 'end': date(1990, 4, 12)},
+        {'name': 'conference_dates', 'value': '11 Mar. 1989',               'begin': (1989,    3,   11), 'end': (1989,    3,   11), 'string':             '1989.03.11'},
+        {'name': 'conference_dates', 'value': '10-12 Mar. 1989',            'begin': (1989,    3,   10), 'end': (1989,    3,   12), 'string': '1989.03.10--1989.03.12'},
+        {'name': 'conference_dates', 'value': '10 Feb.-12 Apr. 1989',       'begin': (1989,    2,   10), 'end': (1989,    4,   12), 'string': '1989.02.10--1989.04.12'},
+        {'name': 'conference_dates', 'value': '10 Feb. 1988-12 Apr. 1990',  'begin': (1988,    2,   10), 'end': (1990,    4,   12), 'string': '1988.02.10--1990.04.12'},
+        {'name': 'conference_dates', 'value': 'Mar. 1989',                  'begin': (1989,    3, None), 'end': (1989,    3, None), 'string':                '1989.03'},
+        {'name': 'conference_dates', 'value': 'Feb.-Apr. 1989',             'begin': (1989,    2, None), 'end': (1989,    4, None), 'string':       '1989.02--1989.04'},
+        {'name': 'conference_dates', 'value': 'Feb. 1988-Apr. 1990',        'begin': (1988,    2, None), 'end': (1990,    4, None), 'string':       '1988.02--1990.04'},
+        {'name': 'conference_dates', 'value': '1989',                       'begin': (1989, None, None), 'end': (1989, None, None), 'string':                   '1989'},
+        {'name': 'conference_dates', 'value': '1988-1990',                  'begin': (1988, None, None), 'end': (1990, None, None), 'string':             '1988--1990'},
+        {'name': 'publication_date', 'value': '11 Mar. 1989',               'begin': (1989,    3,   11), 'end': (1989,    3,   11), 'string':             '1989.03.11'},
+        {'name': 'publication_date', 'value': '10-12 Mar. 1989',            'begin': (1989,    3,   10), 'end': (1989,    3,   12), 'string': '1989.03.10--1989.03.12'},
+        {'name': 'publication_date', 'value': '10 Feb.-12 Apr. 1989',       'begin': (1989,    2,   10), 'end': (1989,    4,   12), 'string': '1989.02.10--1989.04.12'},
+        {'name': 'publication_date', 'value': '10 Feb. 1988-12 Apr. 1990',  'begin': (1988,    2,   10), 'end': (1990,    4,   12), 'string': '1988.02.10--1990.04.12'},
+        {'name': 'publication_date', 'value': 'Mar. 1989',                  'begin': (1989,    3, None), 'end': (1989,    3, None), 'string':                '1989.03'},
+        {'name': 'publication_date', 'value': 'Feb.-Apr. 1989',             'begin': (1989,    2, None), 'end': (1989,    4, None), 'string':       '1989.02--1989.04'},
+        {'name': 'publication_date', 'value': 'Feb. 1988-Apr. 1990',        'begin': (1988,    2, None), 'end': (1990,    4, None), 'string':       '1988.02--1990.04'},
+        {'name': 'publication_date', 'value': '1989',                       'begin': (1989, None, None), 'end': (1989, None, None), 'string':                   '1989'},
+        {'name': 'publication_date', 'value': '1988-1990',                  'begin': (1988, None, None), 'end': (1990, None, None), 'string':             '1988--1990'},
     ])
-    def testDates(self, name, value, begin, end):
+    def testDates(self, name, value, begin, end, string):
         result = Result({name: value})
         self.assertIn(name, result)
-        self.assertEqual(result[name].begin, begin)
-        self.assertEqual(result[name].end, end)
+        self.assertEqual((result[name].begin.year), begin[0])
+        self.assertEqual((result[name].begin.month), begin[1])
+        self.assertEqual((result[name].begin.day), begin[2])
+        self.assertEqual((result[name].end.year), end[0])
+        self.assertEqual((result[name].end.month), end[1])
+        self.assertEqual((result[name].end.day), end[2])
+        self.assertEqual(str(result[name]), string)
 
 
     @TestData([
