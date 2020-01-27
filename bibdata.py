@@ -19,6 +19,13 @@ import re
 from warnings import warn as warning
 from urllib.parse import urlparse
 
+try:
+    from colorama import Style
+except ImportError:
+    class Style:
+        BRIGHT = ''
+        RESET_ALL = ''
+
 class DOI:
     """ An instance of this class represents a DOI (Document Object Identifier). The provided *value* is validated upon instance construction.
 
@@ -110,10 +117,36 @@ def urlValidator(url):
 
     return bool(r.netloc or r.path)
 
-class Author:
-    """ Author(value)
+class Date:
+    """ An instance of this class represents a date. Note that :class:`datetime.date` is not suitable for this purpose because day (or even month) may not be provided in bibliographic data.
 
-        An instance of this class represents an author.
+        :param year: The year (giving `None` yields an invalid date).
+        :param month: The month.
+        :param day: The day.
+    """
+    def __init__(self, year, month=None, day=None):
+        self.year = int(year) if year is not None else None
+        self.month = int(month) if (month is not None) and (self.year is not None) else None
+        self.day = int(day) if (day is not None) and (self.month is not None) else None
+
+    def isValid(self):
+        """ Returns `True` when the given date is a valid date (year is not `None`).
+
+            :returns: `True` when the date is valid, `False` otherwise.
+        """
+        return self.year is not None
+
+    def __eq__(self, other):
+        return (self.year == other.year) and (self.month == other.month) and (self.day == other.day)
+
+    def __repr__(self):
+        return f"Date({self.year}, {self.month}, {self.day})"
+
+    def __str__(self):
+        return '.'.join([f"{n:02}" for n in [self.year, self.month, self.day] if n is not None])
+
+class Author:
+    """ An instance of this class represents an author.
         The author name and forenames can be provided as a :class:`list` or as a :class:`str`.
 
         This class behaves as an immutable :class:`dict` with the following attributes:
@@ -294,15 +327,31 @@ class BibData:
         v = self.__check(value, name)
         if v is not None:
             if name in self.__data:
-                warning(f"Field \"{name}\" is already present in entry")
-            else:
-                self.__data[name] = v
+                warning(f"Overwriting field \"{name}\" which is already present in entry")
+            self.__data[name] = v
 
     def __repr__(self):
         return f"{type(self).__name__}({repr(self.__data)})"
 
     def __str__(self):
-        return f"{type(self).__name__}({str(self.__data)})"
+        try:
+            ans = f"{self.__data['authors']}, "
+        except:
+            ans = ''
+
+        ans += f"{Style.BRIGHT}\"{self.__data['title']}\"{Style.RESET_ALL}"
+
+        try:
+            ans += f" in {self.__data['publication_title']}"
+        except:
+            pass
+
+        try:
+            ans += f", {self.__data['year']}"
+        except:
+            pass
+
+        return ans
 
 class BibDataSet:
     """ An instance of this class behaves as a list of bibliography data. The given data can be either an existing :class:`BibDataSet` for copy construction or a list of bibliography data as :class:`BibData` instances or dictionnaries.
@@ -335,7 +384,7 @@ class BibDataSet:
         if isinstance(other, BibDataSet):
             self.__data += other.__data
         elif isinstance(other, BibData):
-            self.__data += [other]
+            self.__data += [self.__class__.dataType(other)]
         else:
             raise ValueError("Only BibDataSets and BibData can be added to a BibDataSet")
         return self
