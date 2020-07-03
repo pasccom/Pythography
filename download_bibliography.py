@@ -1,0 +1,159 @@
+#! /usr/bin/python3
+
+import re
+import os
+
+from pdfrw import PdfReader, PdfWriter
+from argparse import ArgumentParser
+from appdirs import AppDirs
+from configparser import ConfigParser
+from subprocess import Popen
+
+from ieeexplore import Database as I3EDatabase
+from bibtex import BibFile
+
+def askUser(prompt, answers=None):
+    ans = input(prompt + ' ').lower()
+    while (answers is not None) and (ans not in answers):
+        ans = input().lower()
+    return ans
+
+def process_title(title):
+    match = re.fullmatch(r'(?P<title>[^\r]+)\r? - (?P<conf1>.+)(?:, (?P<conf0>.+))?', title.to_unicode())
+
+    if match is None:
+        title = title.to_unicode()
+    else:
+        title = match['title']
+
+    print(f"Found title \"{title}\".")
+    ans = askUser("Do you confirm [Y/n]?", ['y', 'n', ''])
+    if (ans == 'n'):
+        return None
+    return title
+
+def process(db, path, bibfile, pdfReader=None):
+    if os.path.isdir(path):
+        for f in os.listdir(path):
+            process(bibFile, db, os.path.join(path, f))
+    elif os.path.isfile(path) and path.endswith('.pdf'):
+        print(f'Processing \"{path}\" ... ')
+
+        # Try to get title from PDF metadata:
+        title = None
+        pdf = PdfReader(path)
+        if pdf.Info.Title is not None:
+            title = process_title(pdf.Info.Title)
+        else:
+            print("Title is not given in PDF metadata")
+
+        # Ask user to read title in PDF reader:
+        if title is None:
+            pdfReaderProcess = None
+            try:
+                pdfReaderProcess = Popen([pdfReader or 'okular', path])
+            except FileNotFoundError:
+                pass
+            title = input("Please enter title of PDF file: ")
+            if pdfReaderProcess is not None:
+                pdfReaderProcess.terminate()
+
+            # Update title in PDF metadata:
+            if title != '':
+                if pdf.Info.Title is None:
+                    ans = askUser("Do you want to update PDF metadata? [Y/n]", ['', 'y', 'n']) or 'y'
+                else:
+                    ans = askUser("Do you want to update PDF metadata? [Y/n]", ['', 'y', 'n']) or 'n'
+                if (ans == 'y'):
+                    pdf.Info.Title = title
+                    os.rename(path, path + '.old')
+                    PdfWriter(path, trailer=pdf).write()
+
+        if title == '':
+            return
+
+        # Query I3Explore database for bibliographic information:
+        query = db.query(article_title=title)
+        query.limit(25)
+        results = query.send()
+
+        # Search right result:
+        result = None
+        if (len(results) == 0):
+            print(f"Could not retrieve bibliographic data for: \"{title}\"")
+        elif (len(results) > 1):
+            print(f"Found {results.total} entries:")
+            current = 0
+            while True:
+                for r in range(current, len(results)):
+                    print(f"{r + 1}: {results[r]}")
+                current = len(results)
+                ans = askUser("Choose bibliography item:", [''] + [str(i + 1) for i in range(0, len(results))])
+                if (ans != ''):
+                    result = results[int(ans) - 1]
+                    break
+                try:
+                    results.fetchMore()
+                except EOFError:
+                    break
+        else:
+            result = results[0]
+
+        # Add result to bibfile:
+        if result is not None:
+            bibfile += result
+            bibfile[-1]['file'] = os.path.relpath(path, os.path.dirname(bibfile.filePath))
+
+if __name__ == '__main__':
+    # Parse command line arguments:
+    argParser = ArgumentParser(
+        description="Retrive bibliography for PDF files or retieve PDF from bibliography",
+        epilog="""License: GPL v3, see <http://www.gnu.org/licenses/>
+Copyright (c) 2019-2020 Pascal COMBES <pascom@orange.fr>""")
+    argParser.add_argument('-c', '--config',
+        default=None,
+        required=False,
+        dest='config',
+        help="Path to the configuration file"
+    )
+    argParser.add_argument('bibFile',
+        nargs=1,
+        help="BibTeX file where to write bibliographic data"
+    )
+    argParser.add_argument('files',
+        nargs='*',
+        help="List of files or directories to process"
+    )
+    args = argParser.parse_args()
+
+    # Determine config file path:
+    configFilePath = args.config
+    if configFilePath is None:
+        configFilePath = AppDirs("Pythography", "Pascom").user_config_dir + '.conf'
+    print(f"Loading configuration from: {configFilePath}")
+
+    # Read config file:
+    config = ConfigParser()
+    config.read(configFilePath)
+    if 'I3Explore' not in config:
+        config['I3Explore'] = {}
+    if 'apiKey' not in config['I3Explore']:
+        config['I3Explore']['apiKey'] = askUser("Please enter your I3Explore API key (visit https://developer.ieee.org/ to obtain one):")
+        if (config['I3Explore']['apiKey'] == ''):
+            del config['I3Explore']['apiKey']
+        else:
+            with open(configFilePath, 'w') as configFile:
+                config.write(configFile)
+
+    # PDF reader from config (fallback to okular):
+    pdfReader = None
+    if ('local' in config) and ('pdfReader' in config['local']):
+        pdfReader = config['local']['pdfReader']
+
+    # Create I3E and bibTeX databases:
+    if 'apiKey' in config['I3Explore']:
+        db = I3EDatabase(config['I3Explore']['apiKey'])
+        bibFile = BibFile(args.bibFile[0])
+        for f in args.files:
+            process(db, f, bibFile, pdfReader)
+        bibFile.write()
