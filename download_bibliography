@@ -107,7 +107,7 @@ def process(db, path, bibfile, pdfReader=None):
 if __name__ == '__main__':
     # Parse command line arguments:
     argParser = ArgumentParser(
-        description="Retrive bibliography for PDF files or retieve PDF from bibliography",
+        description="Retrive bibliography for PDF files from IEEExplore",
         epilog="""License: GPL v3, see <http://www.gnu.org/licenses/>
 Copyright (c) 2019-2020 Pascal COMBES <pascom@orange.fr>""")
     argParser.add_argument('-c', '--config',
