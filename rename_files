@@ -17,7 +17,7 @@ if __name__ == '__main__':
 Copyright (c) 2019-2020 Pascal COMBES <pascom@orange.fr>""")
     argParser.add_argument('bibFile',
         nargs=1,
-        help="BibTeX file where to write bibliographic data"
+        help="BibTeX file where to search for linked files"
     )
     args = argParser.parse_args()
 
