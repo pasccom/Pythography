@@ -46,7 +46,12 @@ Copyright (c) 2019-2020 Pascal COMBES <pascom@orange.fr>""")
 
     # Move files and update file entries:
     for bibItem in bibFile:
-        oldPath = bibItem['file']
+        try:
+            oldPath = bibItem['file']
+        except (KeyError):
+            warning(f"No file field in: {bibItem}")
+            continue
+
         if os.path.isabs(oldPath):
             oldPath = os.path.relpath(oldPath, os.path.dirname(args.bibFile[0]))
         newPath = os.path.join(os.path.dirname(oldPath), bibItem['key'] + '.pdf')
