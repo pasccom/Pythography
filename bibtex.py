@@ -385,7 +385,10 @@ class BibFile(bibdata.BibDataSet):
                     mode = prevMode
             elif mode == ENTRY_TYPE:
                 if c == '{':
-                    self.__iadd__(self.parseEntry(bibFile, entryType.strip().lower()))
+                    try:
+                        self.__iadd__(self.parseEntry(bibFile, entryType.strip().lower()))
+                    except (ValueError):
+                        warning(f"Encountered unsupported bibTeX entry: {entryType.strip().lower()}")
                     mode = OUTSIDE
                 elif c == '%':
                     prevMode = mode
@@ -416,11 +419,11 @@ class BibFile(bibdata.BibDataSet):
             c = bibFile.read(1)
             if not c:
                 warning("Unexpected end of file inside entry")
-                return bibData
+                break
 
             if mode == OUTSIDE:
                 if c == '}':
-                    return bibData
+                    break
                 elif not c.strip():
                     continue
                 elif c == '%':
@@ -436,7 +439,7 @@ class BibFile(bibdata.BibDataSet):
                 if c == '}':
                     #print(f"Parsed field name: \"{fieldName}\"")
                     bibData['key'] = fieldName.strip()
-                    return bibData
+                    break
                 elif c == '=':
                     #print(f"Parsed field name: \"{fieldName}\"")
                     mode = FIELD_VALUE
@@ -455,7 +458,7 @@ class BibFile(bibdata.BibDataSet):
                 if c == '}':
                     #print(f"Parsed field value: \"{fieldValue}\"")
                     bibData[fieldName.strip()] = fieldValue.strip()
-                    return bibData
+                    break
                 if c == '\\':
                     escaped = not escaped
                 elif (c == ',') and not escaped:
@@ -469,6 +472,9 @@ class BibFile(bibdata.BibDataSet):
                     fieldValue += self.parseGroup(bibFile)
                 else:
                     fieldValue += c
+
+        if 'content_type' in bibData:
+            return bibData
 
     def parseGroup(self, bibFile):
         """ parseGroup(bibFile)
