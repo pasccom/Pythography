@@ -52,6 +52,9 @@ Copyright (c) 2019-2020 Pascal COMBES <pascom@orange.fr>""")
             warning(f"No file field in: {bibItem}")
             continue
 
+        if oldPath.startswith(':'):
+            oldPath = oldPath.split(':')[1]
+
         if os.path.isabs(oldPath):
             oldPath = os.path.relpath(oldPath, os.path.dirname(args.bibFile[0]))
         newPath = os.path.join(os.path.dirname(oldPath), bibItem['key'] + '.pdf')
