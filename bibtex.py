@@ -313,7 +313,11 @@ class BibFile(bibdata.BibDataSet):
 
     def __genKey(self, bibItem, mangle=True):
         if 'key' in bibItem:
-            key = bibItem['key']
+            parts = bibItem['key'].split('-')
+            if (len(parts) > 1) and parts[-1].isdigit():
+                key = '-'.join(parts[:-1]) # Remove mangling part.
+            else:
+                key = '-'.join(parts)
         else:
             authors = bibItem[self.__getField(bibItem, 'author')]
             key = ''.join([authors[0]['name']] + [author['initial'] for author in authors[1:]])
