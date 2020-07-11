@@ -48,11 +48,7 @@ def process_title(title):
         return None
     return title
 
-def process(db, path, bibfile, pdfReader=None):
-    if os.path.isdir(path):
-        for f in os.listdir(path):
-            process(bibFile, db, os.path.join(path, f))
-    elif os.path.isfile(path) and path.endswith('.pdf'):
+def processPdf(db, path, pdfReader=None):
         print(f'Processing \"{path}\" ... ')
 
         # Try to get title from PDF metadata:
@@ -94,7 +90,6 @@ def process(db, path, bibfile, pdfReader=None):
         results = query.send()
 
         # Search right result:
-        result = None
         if (len(results) == 0):
             print(f"Could not retrieve bibliographic data for: \"{title}\"")
         elif (len(results) > 1):
@@ -106,15 +101,20 @@ def process(db, path, bibfile, pdfReader=None):
                 current = len(results)
                 ans = askUser("Choose bibliography item:", [''] + [str(i + 1) for i in range(0, len(results))])
                 if (ans != ''):
-                    result = results[int(ans) - 1]
-                    break
+                    return results[int(ans) - 1]
                 try:
                     results.fetchMore()
                 except EOFError:
                     break
         else:
-            result = results[0]
+            return results[0]
 
+def process(db, path, bibfile, pdfReader=None):
+    if os.path.isdir(path):
+        for f in os.listdir(path):
+            process(db, os.path.join(path, f), bibFile, pdfReader)
+    elif os.path.isfile(path) and path.endswith('.pdf'):
+        result = processPdf(db, path, pdfReader)
         # Add result to bibfile:
         if result is not None:
             bibfile += result
