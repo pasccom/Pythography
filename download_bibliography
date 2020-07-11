@@ -170,6 +170,12 @@ Copyright (c) 2019-2020 Pascal COMBES <pascom@orange.fr>""")
     if 'apiKey' in config['I3Explore']:
         db = I3EDatabase(config['I3Explore']['apiKey'])
         bibFile = BibFile(args.bibFile[0])
-        for f in args.files:
-            process(db, f, bibFile, pdfReader)
-        bibFile.write()
+        try:
+            for f in args.files:
+                process(db, f, bibFile, pdfReader)
+            bibFile.write()
+        except (KeyboardInterrupt):
+            bibFile.write()
+        except:
+            bibFile.write()
+            raise
