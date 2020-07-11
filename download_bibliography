@@ -132,6 +132,18 @@ Copyright (c) 2019-2020 Pascal COMBES <pascom@orange.fr>""")
         dest='config',
         help="Path to the configuration file"
     )
+    argParser.add_argument('-t', '--truncate',
+        action='store_true',
+        required=False,
+        dest='truncate',
+        help="Erase the bib file before adding new items"
+    )
+    #argParser.add_argument('-m', '--merge', # TODO for next version.
+    #    action='store_true',
+    #    required=False,
+    #    dest='merge',
+    #    help="Merge new items with existing ones"
+    #)
     argParser.add_argument('bibFile',
         nargs=1,
         help="BibTeX file where to write bibliographic data"
@@ -170,6 +182,8 @@ Copyright (c) 2019-2020 Pascal COMBES <pascom@orange.fr>""")
     if 'apiKey' in config['I3Explore']:
         db = I3EDatabase(config['I3Explore']['apiKey'])
         bibFile = BibFile(args.bibFile[0])
+        if not args.truncate and os.path.exists(args.bibFile[0]):
+            bibFile.read()
         try:
             for f in args.files:
                 process(db, f, bibFile, pdfReader)

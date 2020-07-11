@@ -518,7 +518,7 @@ class BibFile(bibdata.BibDataSet):
             else:
                 group += c
 
-    def write(self, mode='at'):
+    def write(self, mode='wt'):
         """ write(mode='at')
 
             Writes the underlying bibliography data to the ``*.bib`` file.
