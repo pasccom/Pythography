@@ -54,10 +54,14 @@ Copyright (c) 2019-2020 Pascal COMBES <pascom@orange.fr>""")
 
         if oldPath.startswith(':'):
             oldPath = oldPath.split(':')[1]
-
         if os.path.isabs(oldPath):
             oldPath = os.path.relpath(oldPath, os.path.dirname(args.bibFile[0]))
+
         newPath = os.path.join(os.path.dirname(oldPath), bibItem['key'] + '.pdf')
+        if os.path.exists(newPath):
+            warning(f"File {newPath} already exists")
+            continue
+
         print(f"Moving {oldPath} to {newPath}")
         try:
             os.rename(os.path.join(os.path.dirname(args.bibFile[0]), oldPath),
@@ -66,6 +70,6 @@ Copyright (c) 2019-2020 Pascal COMBES <pascom@orange.fr>""")
         except FileNotFoundError:
             warning(f"Could not find {oldPath}")
 
-    # Write bibTeX file:  
+    # Write bibTeX file:
     bibFile.write()
-    
+
