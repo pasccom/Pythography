@@ -1,0 +1,115 @@
+#! /usr/bin/python3
+# Copyright 2020 Pascal COMBES <pascom@orange.fr>
+#
+# This file is part of Pythography.
+#
+# Pythography is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Pythography is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Pythography. If not, see <http://www.gnu.org/licenses/>
+
+import os
+import re
+
+from pdfrw import PdfReader, PdfWriter
+from argparse import ArgumentParser
+from appdirs import AppDirs
+from configparser import ConfigParser
+from warnings import warn as warning
+
+from bibtex import BibFile
+
+def askUser(prompt, answers=None):
+    ans = input(prompt + ' ').lower()
+    while (answers is not None) and (ans not in answers):
+        ans = input().lower()
+    return ans
+
+def process_title(title):
+    match = re.fullmatch(r'(?P<title>[^\r]+)\r? - (?P<conf1>.+)(?:, (?P<conf0>.+))?', title.to_unicode())
+
+    if match is None:
+        title = title.to_unicode()
+    else:
+        title = match['title']
+
+    return title
+
+if __name__ == '__main__':
+    # Parse command line arguments:
+    argParser = ArgumentParser(
+        description="Check the validity of a BibTeX file",
+        epilog="""License: GPL v3, see <http://www.gnu.org/licenses/>
+Copyright (c) 2019-2020 Pascal COMBES <pascom@orange.fr>""")
+    argParser.add_argument('bibFile',
+        nargs=1,
+        help="BibTeX file where to search for linked files"
+    )
+    args = argParser.parse_args()
+
+    # Load bibTeX file:
+    bibFile = BibFile(args.bibFile[0])
+    bibFile.debug = True
+    bibFile.read()
+    
+    for bibItem in bibFile:
+        # Check that bibliography item has a key:
+        key = None
+        if 'key' not in bibItem:
+            warning(f"{bibItem} does not have bibTeX key")
+        else:
+            key = bibItem['key']
+            # Check that keys are unique:
+            for other in bibFile:
+                if other is bibItem:
+                    continue
+                if 'key' not in other:
+                    continue
+                if (bibItem['key'] == other['key']):
+                    warning(f"2 entries have the same key '{bibItem['key'] }'")
+        # Check that bibliography item has a file:
+        if 'file' not in bibItem:
+            warning(f"Entry '{key}' does not have file field")
+        else:
+            for fileItem in bibItem['file'].split(';'):
+                if os.path.isabs(fileItem):
+                    warining(f"Entry '{key}' has absolute path")
+                    filePath = fileItem
+                else:
+                    parts = fileItem.split(':')
+                    if (len(parts) > 1):
+                        filePath = os.path.join(os.path.dirname(args.bibFile[0]), parts[1])
+                    else:
+                        filePath = os.path.join(os.path.dirname(args.bibFile[0]), fileItem)
+                if not os.path.exists(filePath):
+                    warning(f"Entry '{key}' has non-existing file")
+                else:
+                    pdf = PdfReader(filePath)
+                    ans = ''
+                    if pdf.Info.Title is None:
+                        print(f"Title is not set in {filePath}")
+                        print(f"Bibliography item title: \"{bibItem['title']}\"")
+                        ans = askUser("Do you want to update PDF title? [Y/n/e]", ['y', 'n', 'e', '']) or 'y'
+                    else:
+                        title = process_title(pdf.Info.Title)
+                        if (title != bibItem['title']):
+                            print("Title mismatch:")
+                            print(f"  - Pdf title:               \"{title}\"")
+                            print(f"  - Bibliography item title: \"{bibItem['title']}\"")
+                            ans = askUser("Do you want to update PDF title? [y/N/e]", ['y', 'n', 'e',  '']) or 'n'
+                    if (ans == 'e'):
+                        pdf.Info.Title = input(f"Please enter title for {filePath}:\n")
+                    elif (ans == 'y'):
+                        pdf.Info.Title = bibItem['title']
+                    if (ans == 'e') or (ans == 'y'):
+                        print("Updating PDF title.")
+                        os.rename(filePath, filePath + '.old')
+                        PdfWriter(filePath, trailer=pdf).write()
