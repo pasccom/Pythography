@@ -343,6 +343,10 @@ class BibFile(bibdata.BibDataSet):
 
         return key
 
+    def __debug(self, message):
+        if self.debug:
+            print(f"At {self.filePath}:{self.__line}:{self.__column} -- {message}")
+
     def __warning(self, message):
         warning(f"At {self.filePath}:{self.__line}:{self.__column} -- {message}")
 
@@ -351,6 +355,7 @@ class BibFile(bibdata.BibDataSet):
         self.filePath = filePath
         if self.filePath[-4:] != '.bib':
             self.filePath += '.bib'
+        self.debug = False
         self.__line = 0
         self.__column = 0
         self.__usedKeys = {}
@@ -497,8 +502,11 @@ class BibFile(bibdata.BibDataSet):
                 else:
                     fieldValue += c
 
+        key = bibData['key'] if 'key' in bibData else ''
         if 'content_type' in bibData:
+            self.__debug(f"Parsed entry '{key}' of type '{bibData['content_type']}'")
             return bibData
+        self.__debug(f"Ignoring entry '{key}'")
 
     def parseGroup(self, bibFile):
         """ parseGroup(bibFile)
