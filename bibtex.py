@@ -37,6 +37,8 @@ class BibTeXData(bibdata.BibData):
 
             if month.lower() in months:
                 return month.lower()
+            if month.endswith('.') and (month[:-1].lower() in months):
+                return month[:-1].lower()
 
             try:
                 return months[longMonths.index(month.lower())]
@@ -58,7 +60,7 @@ class BibTeXData(bibdata.BibData):
                 self.begin = int(match['begin'])
                 try:
                     self.end = int(match['end'])
-                except KeyError:
+                except (KeyError, TypeError):
                     self.end = self.begin
 
             def __str__(self):
@@ -341,11 +343,16 @@ class BibFile(bibdata.BibDataSet):
 
         return key
 
+    def __warning(self, message):
+        warning(f"At {self.filePath}:{self.__line}:{self.__column} -- {message}")
+
     def __init__(self, filePath, data=None):
         super().__init__(data)
         self.filePath = filePath
         if self.filePath[-4:] != '.bib':
             self.filePath += '.bib'
+        self.__line = 0
+        self.__column = 0
         self.__usedKeys = {}
 
     def read(self):
@@ -367,10 +374,18 @@ class BibFile(bibdata.BibDataSet):
         ENTRY_TYPE = 1
         COMMENT = 2
 
+        self.__line = 0
+        self.__column = 0
+
         mode = OUTSIDE
 
+        c = '\n'
         while True:
+            if c == '\n':
+                self.__line += 1
+                self.__column = 0
             c = bibFile.read(1)
+            self.__column += 1
             if not c:
                 return
             if mode == OUTSIDE:
@@ -419,10 +434,15 @@ class BibFile(bibdata.BibDataSet):
         escaped = False
         bibData = BibTeXData({'content_type': entryType})
 
+        c = '{'
         while True:
+            if c == '\n':
+                self.__line += 1
+                self.__column = 0
             c = bibFile.read(1)
+            self.__column += 1
             if not c:
-                warning("Unexpected end of file inside entry")
+                self.__warning("Unexpected end of file inside entry")
                 break
 
             if mode == OUTSIDE:
@@ -493,10 +513,17 @@ class BibFile(bibdata.BibDataSet):
         commented = False
         group = ''
 
+        #print(f"Entering group at {self.filePath}:{self.__line}:{self.__column}")
+
+        c='{'
         while True:
+            if c == '\n':
+                self.__line += 1
+                self.__column = 0
             c = bibFile.read(1)
+            self.__column += 1
             if not c:
-                warning("Unexpected end of file inside group")
+                self.__warning("Unexpected end of file inside group")
                 #print(f"Parsed group: {{{self.__cleanGroup(group)}}}")
                 return self.__cleanGroup(group)
 
