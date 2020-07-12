@@ -75,7 +75,7 @@ def processPdf(db, path, pdfReader=None):
                 if pdf.Info.Title is None:
                     ans = askUser("Do you want to update PDF metadata? [Y/n]", ['', 'y', 'n']) or 'y'
                 else:
-                    ans = askUser("Do you want to update PDF metadata? [Y/n]", ['', 'y', 'n']) or 'n'
+                    ans = askUser("Do you want to update PDF metadata? [y/N]", ['', 'y', 'n']) or 'n'
                 if (ans == 'y'):
                     pdf.Info.Title = title
                     os.rename(path, path + '.old')
