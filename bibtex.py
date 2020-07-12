@@ -313,7 +313,17 @@ class BibFile(bibdata.BibDataSet):
         if required:
             warning(f"Could not find required field: {field}")
 
-    def __genKey(self, bibItem, mangle=True):
+    def __usedKeys(self):
+        usedKeys = {}
+        for bibItem in self:
+            key = self.__genKey(bibItem)
+            if key in usedKeys:
+                usedKeys[key] = 1
+            else:
+                usedKeys[key] = 0
+        return usedKeys
+
+    def __genKey(self, bibItem, usedKeys=None):
         if 'key' in bibItem:
             parts = bibItem['key'].split('-')
             if (len(parts) > 1) and parts[-1].isdigit():
@@ -336,19 +346,24 @@ class BibFile(bibdata.BibDataSet):
             except KeyError:
                 pass
 
-        if mangle:
-            if (key in self.__usedKeys) and (self.__usedKeys[key] != 0):
-                self.__usedKeys[key] += 1
-                return key + '-' + str(self.__usedKeys[key] - 1)
+        if (usedKeys is not None) and (key in usedKeys) and (usedKeys[key] != 0):
+            usedKeys[key] += 1
+            return key + '-' + str(usedKeys[key] - 1)
 
         return key
 
     def __debug(self, message):
         if self.debug:
-            print(f"At {self.filePath}:{self.__line}:{self.__column} -- {message}")
+            if self.__line and self.__column:
+                print(f"At {self.filePath}:{self.__line}:{self.__column} -- {message}")
+            else:
+                print(f"In {self.filePath} -- {message}")
 
     def __warning(self, message):
-        warning(f"At {self.filePath}:{self.__line}:{self.__column} -- {message}")
+        if self.__line and self.__column:
+            warning(f"At {self.filePath}:{self.__line}:{self.__column} -- {message}")
+        else:
+            warning(f"In {self.filePath} -- {message}")
 
     def __init__(self, filePath, data=None):
         super().__init__(data)
@@ -358,7 +373,6 @@ class BibFile(bibdata.BibDataSet):
         self.debug = False
         self.__line = 0
         self.__column = 0
-        self.__usedKeys = {}
 
     def read(self):
         """ read()
@@ -392,6 +406,8 @@ class BibFile(bibdata.BibDataSet):
             c = bibFile.read(1)
             self.__column += 1
             if not c:
+                self.__line = 0
+                self.__column = 0
                 return
             if mode == OUTSIDE:
                 if not c.strip():
@@ -557,6 +573,23 @@ class BibFile(bibdata.BibDataSet):
             else:
                 group += c
 
+    def updateKeys(self):
+        """ updateKeys()
+
+            Updates the bibTeX keys of the bibliography items according to the pattern.
+        """
+        usedKeys = self.__usedKeys()
+        print(usedKeys)
+
+        for bibItem in self:
+            key = self.__genKey(bibItem, usedKeys)
+            try:
+                if (bibItem['key'] != key):
+                    self.__debug(f"Changing entry key '{bibItem['key']}' into '{key}'")
+            except KeyError:
+                pass
+            bibItem['key'] = key
+
     def write(self, mode='wt'):
         """ write(mode='at')
 
@@ -564,18 +597,34 @@ class BibFile(bibdata.BibDataSet):
 
             :param mode: The mode for opening the ``*.bib`` file (should be ``'at'`` for appending data or ``'wt'`` for overwriting data).
         """
-        self.__usedKeys = {}
-        for bibItem in self:
-            key = self.__genKey(bibItem, mangle=False)
-            if key in self.__usedKeys:
-                self.__usedKeys[key] = 1
-            else:
-                self.__usedKeys[key] = 0
+        usedKeys = self.__usedKeys()
         print(self.__usedKeys)
 
         with open(self.filePath, mode) as bibFile:
             for bibItem in self:
-                bibFile.write(f"@{bibItem['content_type'].upper()}{{{self.__genKey(bibItem)},\n")
+                # Compute entry key:
+                try:
+                    key = bibItem['key']
+                except (KeyError):
+                    key = self.__genKey(bibItem, usedKeys)
+                    if key in usedKeys:
+                        while True:
+                            usedKeys[key] += 1
+                            key = key + '-' + str(usedKeys[key])
+                            for other in self:
+                                try:
+                                    if (other['key'] == key):
+                                        break
+                                except KeyError:
+                                    pass
+                            else: #nobreak
+                                break
+                        usedKeys[key] += 1
+                    else:
+                        usedKeys[key] = 0
+                # Write beginning of entry:
+                self.__debug(f"Writing entry '{key}'")
+                bibFile.write(f"@{bibItem['content_type'].upper()}{{{key},\n")
                 fieldsDone = ['content_type']
                 # Output required fields:
                 for f in self.bibTypes[bibItem['content_type']]['required']:

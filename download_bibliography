@@ -187,9 +187,12 @@ Copyright (c) 2019-2020 Pascal COMBES <pascom@orange.fr>""")
         try:
             for f in args.files:
                 process(db, f, bibFile, pdfReader)
+            bibFile.updateKeys()
             bibFile.write()
         except (KeyboardInterrupt):
+            bibFile.updateKeys()
             bibFile.write()
         except:
+            bibFile.updateKeys()
             bibFile.write()
             raise

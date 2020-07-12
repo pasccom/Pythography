@@ -40,6 +40,7 @@ Copyright (c) 2019-2020 Pascal COMBES <pascom@orange.fr>""")
     # Load bibTeX file:
     bibFile = BibFile(args.bibFile[0])
     bibFile.read()
+    bibFile.updateKeys()
 
     # Backup bibTeX file:
     os.rename(args.bibFile[0], args.bibFile[0] + '.old')
