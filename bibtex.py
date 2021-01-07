@@ -598,7 +598,7 @@ class BibFile(bibdata.BibDataSet):
             :param mode: The mode for opening the ``*.bib`` file (should be ``'at'`` for appending data or ``'wt'`` for overwriting data).
         """
         usedKeys = self.__usedKeys()
-        print(self.__usedKeys)
+        print(usedKeys)
 
         with open(self.filePath, mode) as bibFile:
             for bibItem in self:
@@ -624,16 +624,20 @@ class BibFile(bibdata.BibDataSet):
                         usedKeys[key] = 0
                 # Write beginning of entry:
                 self.__debug(f"Writing entry '{key}'")
-                bibFile.write(f"@{bibItem['content_type'].upper()}{{{key},\n")
+                try:
+                    contentType = bibItem['content_type']
+                except (KeyError):
+                    contentType = 'misc'
+                bibFile.write(f"@{contentType.upper()}{{{key},\n")
                 fieldsDone = ['content_type']
                 # Output required fields:
-                for f in self.bibTypes[bibItem['content_type']]['required']:
+                for f in self.bibTypes[contentType]['required']:
                     field = self.__getField(bibItem, f, True)
                     if field:
                         bibFile.write(f"  {f} = {{{bibItem[field]}}},\n")
                         fieldsDone += [field]
                 # Output optional fields:
-                for f in self.bibTypes[bibItem['content_type']]['optional']:
+                for f in self.bibTypes[contentType]['optional']:
                     field = self.__getField(bibItem, f, False)
                     if field:
                         bibFile.write(f"  {f} = {{{bibItem[field]}}},\n")
