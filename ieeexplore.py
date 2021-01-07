@@ -684,6 +684,7 @@ class Result(bibdata.BibData):
     def __contentTypeValidator(contentType):
         contentTypeMap = {
             'Journals':     'article',
+            'Magazines':    'article',
             'Conferences':  'inproceedings',
             'Early Access': 'unpublished',
             'Standards':    'booklet',
