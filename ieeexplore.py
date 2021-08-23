@@ -1141,6 +1141,19 @@ class Database:
 
     def __init__(self, key):
         self.__key = key
+        self.__proxies = {}
+
+    @property
+    def proxy(self):
+        if 'http' in self.__proxies:
+            return self.__proxies['http']
+        return None
+
+    @proxy.setter
+    def proxy(self, value):
+        self.__proxies = {}
+        if value is not None:
+            self.__proxies['http'] = value
 
     def query(self, **kwArgs):
         """ Creates a :class:`Query` to this database
