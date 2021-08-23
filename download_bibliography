@@ -181,6 +181,9 @@ Copyright (c) 2019-2020 Pascal COMBES <pascom@orange.fr>""")
     # Create I3E and bibTeX databases:
     if 'apiKey' in config['I3Explore']:
         db = I3EDatabase(config['I3Explore']['apiKey'])
+        if ('local' in config) and ('proxy' in config['local']):
+            db.proxy = config['local']['proxy']
+
         bibFile = BibFile(args.bibFile[0])
         if not args.truncate and os.path.exists(args.bibFile[0]):
             bibFile.read()
