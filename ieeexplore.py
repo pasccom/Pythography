@@ -22,7 +22,7 @@ import datetime
 from warnings import warn as warning
 import json
 
-from urllib.request import urlopen
+from urllib.request import urlopen, ProxyHandler, build_opener as urlopener
 from urllib.parse import urlencode, urlparse
 import urllib.error as urlerrors
 
@@ -1181,7 +1181,7 @@ class Database:
         print(f"Query URL {queryStr}")
         #return
         try:
-            with urlopen(queryStr) as ans:
+            with urlopener(ProxyHandler(self.__proxies)).open(queryStr) as ans:
                 data = json.load(ans)
                 print(json.dumps(data, indent=2))
                 return data
